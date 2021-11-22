@@ -30,6 +30,7 @@ import matplotlib.lines as lines
 from tqdm import tqdm
 import glob
 import statistics 
+import random
 
 #For network adjacency checks
 # from skimage.transform import rotate
@@ -40,6 +41,9 @@ from scipy.spatial import distance
 import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+
+#For voronoi
+from scipy.spatial import Voronoi, voronoi_plot_2d, ConvexHull
 
 import warnings
 # from cell_object import cell_object
@@ -53,8 +57,7 @@ scipy.special.seterr(all='raise')
 class network_object:
     #network object - takes in a (full) segmentation output and initializes a network-object with notable properties calculated
     
-    def __init__(self, instances = None, adjacency_list = None, tag = None, img = None):
-        assert instances is not None or adjacency_list is not None, "Requires either instance segmentation output or adjacency_list"
+    def __init__(self, instances = None, adjacency_list = None, tag = None, img = None, mode = None):
         self.image = img
         self.instances = instances
         self.tag = tag
@@ -63,21 +66,37 @@ class network_object:
         #polygons = np.array(instances['pred_masks'])
         #scores = np.array(instances['scores'])
         
-        if instances is None:
+        # assert instances is not None or adjacency_list is not None, 'Error - need either instances or adj_list for input'
+        if instances is None and adjacency_list is None:
+            assert mode is not None, "Input data as instances and/or adjacency list, or input a generative mode (rand, bary)"
+            self.centroid_list = self.calc_generative_points(mode=mode)
+            self.adjacency_list = self.adj_list_from_points(input_points= self.centroid_list) #--implement voronoi neighboring criteria
+            self.number = len(self.adjacency_list)
+            self.density = 0
+            self.avgscore = 0
+        elif instances is None:
             self.adjacency_list = adjacency_list
             self.number = len(self.adjacency_list)
             self.density = 0
             self.avgscore = 0
-        if adjacency_list is None:
-            '''FIX THIS IF INSTANCE SEG IS IMPLEMENTED ===> GRAPH CONSTRUCTION NEEDS TO 
-            IMPLEMENT VORONOI EDGE CRITERIA INSTEAD OF MINDIST CRITERIA'''
+        elif adjacency_list is None:
+            self.number = len(self.instances['pred_boxes'])
+            self.density = self.number/(instances['image_size'][0]*instances['image_size'][1])
+            self.avgscore = sum(self.instances['scores'])/self.number
+            self.centroid_list = self.construct_centroid_list(self.instances)
+            #self.polygon_list = self.construct_polygon_list(self.instances) # --too memory intensive for regular use
+
+            # self.adjacency_list = self.construct_adjacencies(self.instances) #--implement mindist neighboring criteria
+            self.adjacency_list = self.adj_list_from_points(input_points= self.centroid_list) #--implement voronoi neighboring criteria
+            
+        else:
             self.number = len(self.instances['pred_boxes'])
             self.density = self.number/(instances['image_size'][0]*instances['image_size'][1])
             self.avgscore = sum(self.instances['scores'])/self.number
             self.centroid_list = self.construct_centroid_list(self.instances)
             #self.polygon_list = self.construct_polygon_list(self.instances)
 
-            self.adjacency_list = self.construct_adjacencies(self.instances)
+            self.adjacency_list = adjacency_list
         
         self.graph = self.construct_graph(self.adjacency_list)
         
@@ -145,6 +164,85 @@ class network_object:
                     adjacency_list[i].append (index)
 
         return adjacency_list
+    
+    def calc_generative_points(self, mode = 'rand', number = 500, globalmax = -1, globalmin = 1):
+        if mode == 'rand':
+            points = np.array([[random.random(),random.random()] for i in range(number)])
+            points = points*(globalmax-globalmin)+globalmin
+        elif mode == 'bary':
+            from sympy.utilities.iterables import variations
+            #-----------------------------------------------replace with list comprehension-------------------------------------------------
+            bary_coords = []
+            for r in range(0,18):                           #Change range to generate more or fewer points - 19 gives 1027, 14 gives 547
+                coords = [a for a in variations(list(range(-r,r+1)),3,True)]
+                for c in coords:
+                    if np.abs(c[0])+np.abs(c[1])+np.abs(c[2]) == r*2 and c[0]+c[1]+c[2] == 0:
+                        bary_coords.append(c)
+            def get_cartesian_from_barycentric(b, t):
+                return t.dot(b)
+            t = np.transpose(np.array([[0, np.power(3,1/2)*2/3/2],[-1/2, -1*np.power(3,1/2)/3/2],[1/2, -1*np.power(3,1/3)/3/2]]))
+            points = np.array([list(get_cartesian_from_barycentric(b,t)) for b in bary_coords])
+
+            xmax = np.amax([a[0] for a in points])
+            xmin = np.amin([a[0] for a in points])
+            ymax = np.amax([a[1] for a in points])
+            ymin = np.amin([a[1] for a in points])
+
+            xpoints = [3*(a[0]-xmin)/(xmax-xmin)-1.5 for a in points]
+            ypoints = [3*(a[1]-ymin)/(ymax-ymin)-1.5 for a in points]
+            points = list(zip(xpoints,ypoints))
+            def include(point, minmax = [-1,1]):
+                if point[0] < minmax[0] or point [1] < minmax[0] or point[0] > minmax[1] or point [1] > minmax[1]:
+                    return False
+                return True
+            points = [point for point in points if include(point)]
+        return points
+    
+    def adj_list_from_points(self, input_points=None, globalrange = [-1,1], mode='input'):
+        globalmin = globalrange[0]
+        globalmax = globalrange[1]
+        
+        points=input_points
+
+        v = Voronoi(points)
+        
+        v.regions = [r for r in v.regions if len(r)!=0]
+        
+        xs = [[v.vertices[i[j]][0] for j in range(len(i))] for i in v.regions]
+        ys = [[v.vertices[i[j]][1] for j in range(len(i))] for i in v.regions]
+        
+        vxmax = np.amax(np.amax(xs))
+        print(vxmax)
+        vymax = np.amax(np.amax(ys))
+        vxmin = np.amin(np.amin(xs))
+        print(vxmin)
+        vymin = np.amin(np.amin(ys))
+        
+        buffer = .95
+        print(len(v.regions))
+        
+        v.regions = [v.regions[i] for i in range(len(v.regions)) if np.amax(xs[i])<vxmax*buffer
+                                            and np.amin(xs[i])>vxmin*buffer
+                                            and np.amax(ys[i])<vymax*buffer
+                                            and np.amin(ys[i])>vymin*buffer ]
+        print(len(v.regions))
+        
+        def adj(p1, p2):
+            return len(np.intersect1d(p1,p2))!=0
+
+        adj_list = []
+        for i in range(len(v.regions)):
+            adj_list.append([])
+            for j in range(len(v.regions)):
+                if i == j:
+                    continue
+                if adj(v.regions[i],v.regions[j]):
+                    adj_list[i].append(j)
+
+                    #-----------------------------------------------replace with list comprehension-------------------------------------------------
+        adj_list = [list(np.unique(i)) for i in adj_list]
+        return adj_list
+
         
     def construct_graph(self, adjacency_list):
         g = nx.Graph()
@@ -168,6 +266,7 @@ class network_object:
     def plot_degree(self):
         num_adjacencies = [len(sublist) for sublist in self.adjacency_list]
         fig = plt.figure()
+        plt.title(self.tag)
         plt.hist(num_adjacencies, max(num_adjacencies))
         fig.suptitle('Number of adjacent cells')
         plt.xlabel('# neighbors')
