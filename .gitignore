@@ -2,4 +2,8 @@
 *.jpg
 *.jpeg
 *.svg
-
+*.pth
+*.tif
+*.zip
+*.pkl
+*.json

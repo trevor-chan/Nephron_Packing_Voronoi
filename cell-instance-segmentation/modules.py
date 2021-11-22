@@ -12,13 +12,21 @@ from detectron2.utils.visualizer import Visualizer
 from detectron2.utils.visualizer import ColorMode
 from detectron2.structures.instances import Instances
 
+<<<<<<< HEAD
+from nms_altered import nms
+=======
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
 import data
 
 class BrightfieldPredictor:
     def __init__(self, weights_path=None, confidence=0.7):
         cfg = get_cfg()
         cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
+<<<<<<< HEAD
+        cfg.DATALOADER.NUM_WORKERS = 4
+=======
         cfg.DATALOADER.NUM_WORKERS = 2
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
         cfg.SOLVER.IMS_PER_BATCH = 2
         cfg.SOLVER.BASE_LR = 0.00025  # pick a good LR
         cfg.SOLVER.MAX_ITER = 30000
@@ -36,7 +44,11 @@ class BrightfieldPredictor:
 
         self.cfg = cfg
 
+<<<<<<< HEAD
+        MetadataCatalog.get('training_dataset').set(thing_classes=['tip'])
+=======
         MetadataCatalog.get('training_dataset').set(thing_classes=['cell'])
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
         self.metadata = MetadataCatalog.get('training_dataset')
 
         self.prediction_model = DefaultPredictor(self.cfg)
@@ -63,6 +75,10 @@ class BrightfieldPredictor:
             return v.get_image()[:, :, ::-1]
 
     def visualize(self, im, all_instances):
+<<<<<<< HEAD
+        all_instances[0].pred_masks[0].append(np.array([]))
+=======
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
         v = Visualizer(im[:, :, ::-1],
                   metadata=self.metadata,
                   scale=2.0,
@@ -71,7 +87,11 @@ class BrightfieldPredictor:
         v = v.draw_instance_predictions(all_instances.to("cpu"))
         return Image.fromarray(v.get_image()[:, :, ::-1])
 
+<<<<<<< HEAD
+    def predict_large(self, im, span = 512, stride=96, nmsalg = 'poly'):
+=======
     def predict_large(self, im, span = 256, stride=96, nmsalg = 'poly'):
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
         print('run model')
 
         #add padding
@@ -94,6 +114,24 @@ class BrightfieldPredictor:
 
         all_instances = Instances.cat(all_instances)
         all_instances.pred_masks = np.asarray(all_instances.pred_masks, dtype=object)
+<<<<<<< HEAD
+        # all_instances.pred_masks = list(all_instances.pred_masks)
+
+        
+        if nmsalg == 'poly':
+            all_instances = polygon_nms(all_instances)
+        elif nmsalg == 'bbox':
+            print('run bbox nms')
+            all_instances = bbox_nms(all_instances, overlap=0.6)
+        elif nmsalg == None:
+            print('no nms (DANGER DANGER DANGER)')
+        else:
+            assert False, 'nms algorithm must be poly or bbox'
+
+        #strip padding
+        all_instances.pred_boxes.tensor -= padding
+        all_instances.pred_masks = [[comp - padding for comp in mask] for mask in all_instances.pred_masks]
+=======
 
         if nmsalg == 'poly':
             all_instances = polygon_nms(all_instances)
@@ -105,6 +143,7 @@ class BrightfieldPredictor:
         #strip padding
         all_instances.pred_boxes.tensor -= padding
         all_instances.pred_masks = [[comp - 60 for comp in mask] for mask in all_instances.pred_masks]
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
 
         return all_instances
 
@@ -203,11 +242,19 @@ def bbox_nms(instances, overlap=0.65, top_k=10000):
         idx = idx[IoU.le(overlap)]
 
     keep = keep[:count]
+<<<<<<< HEAD
+    # print(keep)
+    return instances[keep.to('cpu')]
+
+def polygon_nms(instances, score_threshold = .7, top_k=10000, nms_threshold = .5):
+    print('run polygon non-max-suppression')
+=======
     return instances[keep.to('cpu')]
 
 def polygon_nms(instances, score_threshold = .7, top_k=10000, nms_threshold = .5):
     from nms_altered import nms
     print('ran poly_nms')
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
     
     #RUN BB NMS first to preemptively cut masks - function nms is overloaded here, should rename so as not to confuse
     instances = bbox_nms(instances)
@@ -215,6 +262,15 @@ def polygon_nms(instances, score_threshold = .7, top_k=10000, nms_threshold = .5
     def choose_larger(poly):
         #print(poly)
         return max(poly, key = lambda i: len(i))
+<<<<<<< HEAD
+    
+    # delete invalid indices (two or more poly)
+    valids = [inst for inst in range(len(instances)) if len(instances[inst].pred_masks[0])==1]
+    invalids = [inst for inst in range(len(instances)) if len(instances[inst].pred_masks[0])>1]
+    # print(invalids)
+    # instances = instances[torch.tensor(valids)]
+=======
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
 
     polygons = instances.pred_masks
     polygons = [choose_larger(poly) if (len(poly) > 1) else poly[0] for poly in polygons]
@@ -225,7 +281,11 @@ def polygon_nms(instances, score_threshold = .7, top_k=10000, nms_threshold = .5
 
     new_indices = nms(polygons, scores, score_threshold = .7, top_k = 10000, nms_threshold = .5) #, nms_algorithm=<function nms>)
     keep = torch.Tensor(new_indices).long()
+<<<<<<< HEAD
+    return instances[keep]
+=======
     return instances[keep.to('cpu')]
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
 
 def offset_boxes(boxes, offset):
     new_boxes = boxes.clone()

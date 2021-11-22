@@ -12,6 +12,16 @@ from detectron2.utils.visualizer import Visualizer
 from detectron2.utils.visualizer import ColorMode
 from detectron2.structures.instances import Instances
 
+<<<<<<< HEAD
+from nms_altered import nms
+import data
+
+class BrightfieldPredictor:
+    def __init__(self, weights_path=None, confidence=0.7):
+        cfg = get_cfg()
+        cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
+        cfg.DATALOADER.NUM_WORKERS = 4
+=======
 import data
 
 class BrightfieldPredictor:
@@ -19,6 +29,7 @@ class BrightfieldPredictor:
         cfg = get_cfg()
         cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
         cfg.DATALOADER.NUM_WORKERS = 2
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
         cfg.SOLVER.IMS_PER_BATCH = 2
         cfg.SOLVER.BASE_LR = 0.00025  # pick a good LR
         cfg.SOLVER.MAX_ITER = 30000
@@ -32,6 +43,32 @@ class BrightfieldPredictor:
         if weights_path is not None:
             cfg.MODEL.WEIGHTS = weights_path
         else:
+<<<<<<< HEAD
+            cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml")  # Let training initialize from
+
+        self.cfg = cfg
+
+        MetadataCatalog.get('training_dataset').set(thing_classes=['tip'])
+        self.metadata = MetadataCatalog.get('training_dataset')
+
+        self.prediction_model = DefaultPredictor(self.cfg)
+
+    def train(self, dataset_path, max_iterations=30000):
+        DatasetCatalog.register('training_dataset', lambda : data.to_coco(dataset_path))
+        self.cfg.DATASETS.TRAIN = ('training_dataset',)
+        self.cfg.DATASETS.TEST = ()
+        self.cfg.SOLVER.MAX_ITER = max_iterations
+
+        trainer = DefaultTrainer(self.cfg)
+        trainer.resume_or_load(resume=False)
+        trainer.train()
+
+    def predict(self, im):
+            outputs = self.prediction_model(im)
+            v = Visualizer(im[:, :, ::-1],
+                           metadata=self.metadata,
+                           scale=3.0,
+=======
             cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml")  # Let training initialize from 
     
         self.cfg = cfg
@@ -55,6 +92,7 @@ class BrightfieldPredictor:
             v = Visualizer(im[:, :, ::-1],
                            metadata=self.metadata, 
                            scale=3.0, 
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
                            instance_mode=ColorMode.IMAGE_BW   # remove the colors of unsegmented pixels
             )
             v = v.draw_instance_predictions(outputs["instances"].to("cpu"))
@@ -62,21 +100,36 @@ class BrightfieldPredictor:
             return v.get_image()[:, :, ::-1]
 
     def visualize(self, im, all_instances):
+<<<<<<< HEAD
+        all_instances[0].pred_masks[0].append(np.array([]))
+        v = Visualizer(im[:, :, ::-1],
+                  metadata=self.metadata,
+                  scale=2.0,
+=======
         v = Visualizer(im[:, :, ::-1],
                   metadata=self.metadata, 
                   scale=2.0, 
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
                   #instance_mode=ColorMode.IMAGE_BW
         )
         v = v.draw_instance_predictions(all_instances.to("cpu"))
         return Image.fromarray(v.get_image()[:, :, ::-1])
 
+<<<<<<< HEAD
+    def predict_large(self, im, span = 512, stride=96, nmsalg = 'poly'):
+=======
     def predict_large(self, im, span = 256, stride=96, nmsalg = 'poly'):
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
         print('run model')
 
         #add padding
         padding = 60
         im = np.pad(im, ((padding, padding), (padding, padding), (0, 0)),
+<<<<<<< HEAD
+                        mode='constant', constant_values=0)
+=======
                         mode='constant', constant_values=0) 
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
 
         im_height, im_width, _ = im.shape
         all_instances = []
@@ -93,10 +146,30 @@ class BrightfieldPredictor:
 
         all_instances = Instances.cat(all_instances)
         all_instances.pred_masks = np.asarray(all_instances.pred_masks, dtype=object)
+<<<<<<< HEAD
+        # all_instances.pred_masks = list(all_instances.pred_masks)
+
+=======
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
         
         if nmsalg == 'poly':
             all_instances = polygon_nms(all_instances)
         elif nmsalg == 'bbox':
+<<<<<<< HEAD
+            print('run bbox nms')
+            all_instances = bbox_nms(all_instances, overlap=0.6)
+        elif nmsalg == None:
+            print('no nms (DANGER DANGER DANGER)')
+        else:
+            assert False, 'nms algorithm must be poly or bbox'
+
+        #strip padding
+        all_instances.pred_boxes.tensor -= padding
+        all_instances.pred_masks = [[comp - padding for comp in mask] for mask in all_instances.pred_masks]
+
+        return all_instances
+
+=======
             all_instances = nms(all_instances, overlap=0.6)
         else:
             assert False, 'nms algorithm must be polygon or bbox'
@@ -107,6 +180,7 @@ class BrightfieldPredictor:
 
         return all_instances
     
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
 
 #def nonmax_suppression(instances):
 
@@ -126,15 +200,26 @@ def exclude_boundary(instances, padding):
             (box_centers[:, 0] < image_height - padding) &
             (box_centers[:, 1] < image_width - padding))
     return instances[keep]
+<<<<<<< HEAD
+
+    '''alright, it's time for the big boys to take over the computer typey typey
+    things. nothing wrong can do to the bigger dinosaur. woW! that isn't a very
+    good bOx oF cElLz.
+=======
     
     '''alright, it's time for the big boys to take over the computer typey typey
     things. nothing wrong can do to the bigger dinosaur. woW! that isn't a very
     good bOx oF cElLz. 
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
 
     he attac, he defend,  but most importantly...
     he delet one char from a random spot in the program'''
 
+<<<<<<< HEAD
+def bbox_nms(instances, overlap=0.65, top_k=10000):
+=======
 def nms(instances, overlap=0.5, top_k=10000):
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
     """Apply non-maximum suppression at test time to avoid detecting too many
     overlapping bounding boxes for a given object.
     Args:
@@ -202,26 +287,55 @@ def nms(instances, overlap=0.5, top_k=10000):
         idx = idx[IoU.le(overlap)]
 
     keep = keep[:count]
+<<<<<<< HEAD
+    # print(keep)
+    return instances[keep.to('cpu')]
+
+def polygon_nms(instances, score_threshold = .7, top_k=10000, nms_threshold = .5):
+    print('run polygon non-max-suppression')
+    
+    #RUN BB NMS first to preemptively cut masks - function nms is overloaded here, should rename so as not to confuse
+    instances = bbox_nms(instances)
+
+=======
     return instances[keep.to('cpu')]
 
 def polygon_nms(instances, score_threshold = .7, top_k=10000, nms_threshold = .5):
     from nms_altered import nms
     print('ran poly_nms')
     
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
     def choose_larger(poly):
         #print(poly)
         return max(poly, key = lambda i: len(i))
     
+<<<<<<< HEAD
+    # delete invalid indices (two or more poly)
+    valids = [inst for inst in range(len(instances)) if len(instances[inst].pred_masks[0])==1]
+    invalids = [inst for inst in range(len(instances)) if len(instances[inst].pred_masks[0])>1]
+    # print(invalids)
+    # instances = instances[torch.tensor(valids)]
+
+=======
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
     polygons = instances.pred_masks
     polygons = [choose_larger(poly) if (len(poly) > 1) else poly[0] for poly in polygons]
     polygons = [np.reshape(polygon,(int(len(np.transpose(polygon))/2),2)) for polygon in polygons]
     # pass list of lists of polygon vertices
+<<<<<<< HEAD
+
+=======
     
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
     scores = instances.scores
 
     new_indices = nms(polygons, scores, score_threshold = .7, top_k = 10000, nms_threshold = .5) #, nms_algorithm=<function nms>)
     keep = torch.Tensor(new_indices).long()
+<<<<<<< HEAD
+    return instances[keep]
+=======
     return instances[keep.to('cpu')]
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
 
 def offset_boxes(boxes, offset):
     new_boxes = boxes.clone()
@@ -274,4 +388,8 @@ def mask_to_polygons(mask):
     res = res[-2]
     res = [x.flatten() for x in res]
     res = [x for x in res if len(x) >= 6]
+<<<<<<< HEAD
     return res, has_holes
+=======
+    return res, has_holes
+>>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
