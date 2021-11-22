@@ -252,7 +252,6 @@ def nms(boxes, scores, **kwargs):
         # Generate index score pairs
         for i, score in enumerate(scores):
             if (threshold > 0) and (score > threshold):
-<<<<<<< HEAD
                 score_index.append([score.cpu(), i])# changed from score_index.append([score,i])
             else:
                 score_index.append([score.cpu(), i])
@@ -260,16 +259,7 @@ def nms(boxes, scores, **kwargs):
         # Sort the score pair according to the scores in descending order
         
         npscores = np.array(score_index)
-                
-=======
-                score_index.append([score, i])
-            else:
-                score_index.append([score, i])
 
-        # Sort the score pair according to the scores in descending order
-        npscores = np.array(score_index)
-
->>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
         if descending:
             npscores = npscores[npscores[:,0].argsort()[::-1]] #descending order
         else:
@@ -277,11 +267,7 @@ def nms(boxes, scores, **kwargs):
 
         if top_k > 0:
             npscores = npscores[0:top_k]
-<<<<<<< HEAD
-            
-=======
 
->>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
         return npscores.tolist()
     
 
@@ -324,11 +310,7 @@ def nms(boxes, scores, **kwargs):
     if scores is not None:
         assert len(scores) == len(boxes)
 
-<<<<<<< HEAD
     boxes = np.array(boxes, dtype = object)
-=======
-    boxes = np.array(boxes)
->>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
 
     if compare_function == rect_compare:
         # if the bounding boxes integers, convert them to floats --
@@ -338,11 +320,7 @@ def nms(boxes, scores, **kwargs):
 
     # initialize the list of picked indexes
     pick = []
-<<<<<<< HEAD
-    
-=======
 
->>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
     # compute the area of the bounding boxes and sort the bounding
     # boxes by the bottom-right y-coordinate of the bounding box
     areas = area_function(boxes) #(x2 - x1 + 1) * (y2 - y1 + 1)

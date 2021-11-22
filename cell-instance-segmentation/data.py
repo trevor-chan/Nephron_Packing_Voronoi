@@ -14,11 +14,8 @@ import shutil
 from tqdm import tqdm
 from multiprocessing import Process, Queue
 import queue
-<<<<<<< HEAD
 from pycocotools.coco import COCO
 import glob
-=======
->>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
 
 import pycocotools
 from detectron2.structures import BoxMode
@@ -87,13 +84,10 @@ def augment(image, masks, crop_size):
         # Contrast
         contrast_factor = np.random.normal()*0.2 + 1
         image = TF.adjust_contrast(image, contrast_factor)
-<<<<<<< HEAD
-        
+
         #Color Jitter
         jitter = transforms.ColorJitter(hue=.1, saturation=.1)
         image = jitter(image)
-=======
->>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
 
         # Affine
         angle = np.random.uniform(-180, 180)
@@ -148,17 +142,12 @@ class Worker(Process):
             except queue.Empty:
                 return
 
-<<<<<<< HEAD
 def build_dataset(json_path, img_path, out_path, samples_per_img=100, num_threads=16, num_processes=4, selected_ids=None, crop_size=256):
-=======
-def download_dataset(json_path, out_path, samples_per_img=100, num_threads=16, num_processes=4, selected_ids=None, crop_size=256):
->>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
 
     if os.path.exists(out_path):
         shutil.rmtree(out_path)
     os.makedirs(os.path.join(out_path, 'images'))
     os.makedirs(os.path.join(out_path, 'targets'))
-<<<<<<< HEAD
     
     coco = COCO(json_path)
     total_images = len(coco.imgs)
@@ -185,52 +174,17 @@ def download_dataset(json_path, out_path, samples_per_img=100, num_threads=16, n
             img = Image.open(os.path.join(img_path, img_obj['file_name'])).convert('RGB')
             masks = [coco.annToMask(ann) for ann in anns]
             masks = [Image.fromarray(np.uint8(mask)*255).convert('RGB') for mask in masks]
-            
-=======
 
-
-    total_images = 0
-    with open(json_path) as f:
-        data = json.load(f)
-
-    if selected_ids is not None:
-        # Filter only selected images
-        data = [img_obj for img_obj in data if img_obj['External ID'] in selected_ids]
-
-    task_queue = Queue()
-    result_queue = Queue()
-
-    with tqdm(total=len(data)*samples_per_img) as pbar:
-        for img_obj in data:
-
-            img_url = img_obj['Labeled Data']
-            if 'objects' not in img_obj['Label']:
-                continue
-
-            mask_urls = [instance['instanceURI'] for instance in img_obj['Label']['objects']]
-
-
-            img = get_image_from_url(img_url)
-
-            masks = list(ThreadPool(num_threads).imap_unordered(get_image_from_url, mask_urls))
-
->>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
             for _ in range(samples_per_img):
                 task_queue.put(total_images)
                 total_images += 1
 
-<<<<<<< HEAD
-                
-=======
->>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
             workers = []
             for proc_index in range(num_processes):
                 p = Worker(task_queue, result_queue, img, masks, out_path, crop_size)
                 p.daemon = True
                 p.start()
                 workers.append(p)
-
-
 
             for worker in workers:
                 worker.join(200)
@@ -252,7 +206,6 @@ def download_dataset(json_path, out_path, samples_per_img=100, num_threads=16, n
 
 def main():
     ##########################
-<<<<<<< HEAD
     dataset_path = 'datasets/kidney_actual'
     json_path = glob.glob('{}/annotations/*'.format(dataset_path))[0]
     img_path = '{}/images/'.format(dataset_path)
@@ -272,60 +225,14 @@ def main():
                         'MAX_E17_1.png',
                         'MAX_E18_1.png',
                         'MAX_E18_3.png',
-=======
-    json_path = 'kidney_sample-coco-1.0/annotations/instances_default.json'
-    samples_per_img = 50
-    crop_size = 256
-    ##########################
-    print('download dataset')
-
-
-    train_dataset = [
-                     'image_part_001.jpg',
-                     'image_part_002.jpg',
-                     'image_part_003.jpg',
-                     'image_part_004.jpg',
-                     'image_part_005.jpg',
-                     'image_part_006.jpg',
-                     'image_part_007.jpg',
-                     'image_part_008.jpg',
-
-                     'MC171180.JPG',
-                     'MC171177.JPG',
-                     'MC171179.JPG',
-                     'MC171181.JPG',
-                     'MC171178.JPG',
-
-                     '1758_part_004.jpg',
-                     '1758_part_011.jpg',
-                     '1758_part_008.jpg',
-                     '1755_part_004.jpg',
-                     '1730_part_009.jpg',
-                     '0467_part_010.jpg',
-                     '0467_part_003.jpg',
-                     '1773_train.JPG',
-                     '1133_train.JPG',
-                     '0576_train.JPG',
->>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
                     ]
 
-
-
-<<<<<<< HEAD
     build_dataset(json_path, img_path,
                      'datasets/kidney_training',
                      samples_per_img=samples_per_img,
                      selected_ids=None,
                      crop_size=crop_size,
                      num_processes = 48,
-=======
-    download_dataset(json_path,
-                     'datasets/cells_train_256',
-                     samples_per_img=samples_per_img,
-                     selected_ids=None,
-                     crop_size=crop_size,
-                     num_processes = 12,
->>>>>>> 772f13cbb3671e604caa5a673c7dc35da0d9a4b6
                      num_threads = 16)
 
 if __name__ == '__main__':

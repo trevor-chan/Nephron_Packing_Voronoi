@@ -6,7 +6,6 @@ import pickle
 import sys
 from sys import argv
 from detectron2.structures import Instances, Boxes
-
     
 def main(input_file, output_dir = None, rerun = False):
     model = BrightfieldPredictor(weights_path='./models/256/model_final.pth', confidence=0.6)
