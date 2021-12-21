@@ -27,7 +27,6 @@ import networkx as nx
 import pickle
 from PIL import Image, ImageDraw
 import matplotlib.lines as lines
-from tqdm import tqdm
 import glob
 import statistics 
 import random
@@ -99,6 +98,7 @@ class network_object:
             self.adjacency_list = adjacency_list
         
         self.graph = self.construct_graph(self.adjacency_list)
+        self.viable,self.polygons = self.construct_viable_list()
         
         # self.num_components = len(self.get_component_masses()) # - always a connected graph via definition of voronoi
                 
@@ -130,7 +130,13 @@ class network_object:
 #         self.cell_scores = avg([cell.score for cell in cell_list])
         
     def construct_centroid_list(self, instances):
-        return np.array([ (((box[0]+box[2])/2).item() , ((box[1]+box[3])/2).item()) for box in instances["pred_boxes"] ])
+        #_____________________________________________NEEDS CHANGING TO POLYGON MASS CENTROID_______________________________________
+        a = np.array([ (((box[0]+box[2])/2).item() , ((box[1]+box[3])/2).item()) for box in instances["pred_boxes"] ])
+        amax = np.amax(a)
+        amin = np.amin(a)
+        a = [2*(b-amin)/(amax-amin)-1 for b in a]
+        return a
+        # return np.array([ (((box[0]+box[2])/2).item() , ((box[1]+box[3])/2).item()) for box in instances["pred_boxes"] ])
     
     def construct_polygon_list(self, instances):
         return [ np.reshape(mask[0], (int(len(mask[0])/2) , 2)) for mask in instances["pred_masks"] ]
@@ -165,7 +171,7 @@ class network_object:
 
         return adjacency_list
     
-    def calc_generative_points(self, mode = 'rand', number = 500, globalmax = -1, globalmin = 1):
+    def calc_generative_points(self, mode = 'rand', number = 500, globalmax = 1, globalmin = -1):
         if mode == 'rand':
             points = np.array([[random.random(),random.random()] for i in range(number)])
             points = points*(globalmax-globalmin)+globalmin
@@ -212,14 +218,11 @@ class network_object:
         ys = [[v.vertices[i[j]][1] for j in range(len(i))] for i in v.regions]
         
         vxmax = np.amax(np.amax(xs))
-        print(vxmax)
         vymax = np.amax(np.amax(ys))
         vxmin = np.amin(np.amin(xs))
-        print(vxmin)
         vymin = np.amin(np.amin(ys))
         
         buffer = .95
-        print(len(v.regions))
         
         v.regions = [v.regions[i] for i in range(len(v.regions)) if np.amax(xs[i])<vxmax*buffer
                                             and np.amin(xs[i])>vxmin*buffer
@@ -242,6 +245,22 @@ class network_object:
                     #-----------------------------------------------replace with list comprehension-------------------------------------------------
         adj_list = [list(np.unique(i)) for i in adj_list]
         return adj_list
+    
+    #List (1 or 0) for regions not contacting border and regions contacting border respectively    
+    def construct_viable_list(self, globalmax = 1, globalmin = -1):
+        v = Voronoi(self.centroid_list)
+        v.regions = [r for r in v.regions if len(r)!=0]
+        
+        polygons = [([x[0] for x in polygon],[y[1] for y in polygon]) 
+            for polygon in [[v.vertices[point] for point in region] for region in v.regions]]
+        polygons = [[v.vertices[point] for point in region] for region in v.regions]
+        
+        buffer = 0.95
+                
+        viable = [1 if np.amax(polygon)<(globalmax*buffer) and np.amin(polygon)>(globalmin*buffer) else 0 for polygon in polygons]
+        polygons = [polygon for polygon in polygons if np.amax(polygon)<(globalmax*buffer) 
+                                                    and np.amin(polygon)>(globalmin*buffer)]
+        return (viable,polygons)
 
         
     def construct_graph(self, adjacency_list):
@@ -257,20 +276,14 @@ class network_object:
         return g
     
     def average_degree(self):
-        return sum([len(sublist) for sublist in self.adjacency_list])/self.number
+        # return sum([len(sublist) for sublist in self.adjacency_list])/self.number
+        return sum([len(sublist) for sublist in self.polygons])/len(self.polygons)
                                                                          
     def degree_variance(self):
-        numadj = [len(sublist) for sublist in self.adjacency_list]
+        numadj = [len(sublist) for sublist in self.polygons]
+        if len(np.unique(numadj)) == 1:
+            return 0
         return statistics.variance(numadj)
-        
-    def plot_degree(self):
-        num_adjacencies = [len(sublist) for sublist in self.adjacency_list]
-        fig = plt.figure()
-        plt.title(self.tag)
-        plt.hist(num_adjacencies, max(num_adjacencies))
-        fig.suptitle('Number of adjacent cells')
-        plt.xlabel('# neighbors')
-        plt.ylabel('count')
     
     def calc_fractal_dim(self, threshold = 0.25, point = False, image = True):
         from PIL import ImageDraw
@@ -468,6 +481,44 @@ class network_object:
         Rsquared = 1.0 - (np.var(absError) / np.var(ydata))
 
         return popt, Rsquared, RMSE, pcov, perr, xdata, ydata
+    
+    def visualize_voronoi(self, globalmax = 1, globalmin = -1):
+        import matplotlib.patches as patches
+        shapes = []
+        maxlen = max([len(poly) for poly in self.polygons])+1
+
+        for poly in self.polygons:
+            color = ((len(poly)-1)/maxlen, (len(poly)-1)/maxlen, (len(poly)-1)/maxlen)
+            shapes.append(patches.Polygon(poly, facecolor=color, edgecolor=(0,0,0)))
+        fig, ax = plt.subplots()
+        ax.set(xlim=(globalmin, globalmax), ylim=(globalmin, globalmax))
+
+        for sh in shapes: 
+            ax.add_patch(sh)
+        plt.show()
+        
+    def visualize_centroids(self):
+        plt.scatter([a[0] for a in self.centroid_list],[a[1] for a in self.centroid_list])
+        plt.show()
+        
+            
+    def plot_degree(self):
+        num_adjacencies = [len(sublist) for sublist in self.polygons]
+        fig = plt.figure()
+        plt.title(self.tag)
+        plt.hist(num_adjacencies, 
+                 bins = np.arange(min(num_adjacencies)-1, max(num_adjacencies) + 2, 1),
+                density=True)
+        fig.suptitle('Number of adjacent cells')
+        plt.xlabel('# neighbors')
+        plt.ylabel('count')
+        
+        if self.degree_variance() != 0:
+            from scipy.stats import norm
+            mu, std = norm.fit(num_adjacencies)
+            x = np.linspace(1, 10, 100)
+            p = norm.pdf(x, mu, std)
+            plt.plot(x, p, 'k', linewidth=2)
     
     def pickle_object(self):
         #pickle the whole object
