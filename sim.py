@@ -132,8 +132,10 @@ class Particle(object):
             if (dtheta >  size * 0.5): dtheta -= size
             elif (dtheta <= -size * 0.5): dtheta += size
             
-            dx = radius*math.sin(dtheta)/math.sin((math.pi-dtheta)/2)
-            dy = radius*math.sin(dphi)/math.sin((math.pi-dphi)/2)
+            # dx = radius*math.sin(dtheta)/math.sin((math.pi-dtheta)/2)
+            # dy = radius*math.sin(dphi)/math.sin((math.pi-dphi)/2)
+            dx = radius*dtheta
+            dy = radius*dphi
             return dx,dy
         
         # dx = ox - self.x
